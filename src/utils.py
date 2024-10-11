@@ -1,0 +1,45 @@
+import os
+import re
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
+runs_data_folder = "data"
+
+
+def get_max_integer_folder(parent_dir):
+    # List all subfolders in the parent directory
+    subfolders = [
+        f for f in os.listdir(parent_dir) if os.path.isdir(os.path.join(parent_dir, f))
+    ]
+
+    # Use a regular expression to find subfolders with integer names
+    integer_folders = [int(f) for f in subfolders if re.match(r"^\d+$", f)]
+
+    # Find the maximum integer folder
+    if integer_folders:
+        return max(integer_folders)
+    else:
+        return 1
+
+
+def get_run_id(declared_run_id, runs_data_folder=runs_data_folder):
+    # if we have not declared a run the give this run a new id
+    if declared_run_id is not None:
+        return declared_run_id
+    else:
+        max_run_so_far = get_max_integer_folder(runs_data_folder)
+        return max_run_so_far + 1
+
+
+def get_run_folder_path(declared_run_id=None, runs_data_folder=runs_data_folder):
+
+    run_id = get_run_id(declared_run_id)
+
+    run_subfolder = f"{runs_data_folder}/{run_id}"
+
+    # create subfolder in data directory for this run ID
+    if not os.path.exists(run_subfolder):
+        os.makedirs(run_subfolder)
+
+    return run_subfolder

@@ -1,0 +1,21 @@
+   repos:
+      - repo: https://github.com/pre-commit/pre-commit-hooks
+        rev: v3.2.0
+        hooks:
+        - id: trailing-whitespace
+        - id: end-of-file-fixer
+        - id: check-added-large-files
+          args: ['--maxkb=5000']
+          description: do not upload files larger than 5000kb / 5MB to avoid data being uploaded
+        - id: mixed-line-ending
+          args: ['--fix=lf']
+          description: Forces to replace line ending by the UNIX 'lf' character.
+      - repo: https://github.com/psf/black
+        rev: 24.2.0
+        hooks:
+        - id: black
+        - id: black-jupyter
+      - repo: https://github.com/kynan/nbstripout
+        rev: 0.3.9
+        hooks:
+        - id: nbstripout
