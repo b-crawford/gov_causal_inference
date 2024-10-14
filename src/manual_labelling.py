@@ -10,8 +10,14 @@ import utils
 import os
 import textwrap
 
+
 # Set the width for text wrapping
-width = 50
+def wrap_tab_print(string, width=50):
+    if pd.isna(string):
+        print("\tNone found.")
+    else:
+        for line in textwrap.wrap(string, width=width):
+            print("\t" + line)
 
 
 # Function to ask for command line input
@@ -27,8 +33,7 @@ def user_labelling():
 
         print("\nPlease choose between one of the following options")
         for key, value in options.items():
-            for line in textwrap.wrap(f"\t{key}: {value}", width=width):
-                print("\t" + line)
+            wrap_tab_print(f"{key}: {value}")
 
         user_input = input(
             f"\nPlease choose an option by entering the label code: ({list(options.keys())}): "
@@ -38,7 +43,9 @@ def user_labelling():
             print(f"You selected: {options[user_input]}")
             return user_input
         else:
-            print(f"Invalid option. Please choose a valid option: {options_string}.")
+            print(
+                f"Invalid option. Please choose a valid option: {list(options.keys())}."
+            )
 
 
 def main(run_id):
@@ -50,50 +57,56 @@ def main(run_id):
     descriptions = utils.get_descriptions(run_path)
 
     # merge together
-    merged = descriptions.merge(
-        manually_labelled_examples, on=["url", "details"], how="left", indicator=True
-    )
+    if manually_labelled_examples is not None:
+        merged = descriptions.merge(
+            manually_labelled_examples[["url"]], on="url", how="left", indicator=True
+        )
+        unlabelled_indices = merged["_merge"] == "left_only"
 
-    unlabelled_indices = merged["_merge"] == "left_only"
+        print(f"Number of previously labelled examples: {sum(~unlabelled_indices)}")
+        print(f"Number to label: {sum(unlabelled_indices)}")
 
-    print(f"Number of previously labelled examples: {sum(~unlabelled_indices)}")
-    print(f"Number to label: {sum(unlabelled_indices)}")
-
-    # isolate those which need labelling
-    merged = merged.loc[unlabelled_indices]
+        # isolate those which need labelling
+        merged = merged.loc[unlabelled_indices].drop(labels=["_merge"], axis=1)
+    else:
+        merged = descriptions
 
     # randomise the order
     merged = merged.sample(frac=1, replace=False)
 
-    for i, row in merged.iterrows():
+    for row in merged.to_dict("records"):
 
         print("-" * 80)
         print("-" * 80)
         print("-" * 80)
 
-        print("The details for the next example read:")
+        print("The url for the next example is:")
+        wrap_tab_print(row["url"])
 
-        # Wrap the text and print each line tabbed
-        for line in textwrap.wrap(row["details"], width=width):
-            print("\t" + line)
+        print("The publishing organisation is:")
+        wrap_tab_print(row["publishing_institution"])
+
+        print("The title is:")
+        wrap_tab_print(row["title"])
+
+        print("The context is:")
+        wrap_tab_print(row["context"])
+
+        print("The description reads:")
+        wrap_tab_print(row["description"])
+
+        print("The details section reads:")
+        wrap_tab_print(row["details"])
 
         # ask the user to label it
-        user_label = user_labelling()
+        row["label"] = user_labelling()
+
+        # save the time
+        row["labelled_at"] = datetime.now()
 
         # save to file
-        new_row = pd.DataFrame(
-            {
-                "url": [row["url"]],
-                "details": [row["details"]],
-                "user_label": [user_label],
-            }
-        )
-
-        new_row.to_csv(
-            utils.get_manually_labelled_filepath(run_path),
-            mode="a",
-            header=False,
-            index=False,
+        pd.DataFrame(row, index=[0]).to_csv_or_append(
+            utils.get_manually_labelled_filepath(run_path)
         )
 
 

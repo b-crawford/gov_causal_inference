@@ -55,10 +55,7 @@ def get_manually_labelled_examples(run_path):
     filepath = get_manually_labelled_filepath(run_path)
 
     if not os.path.exists(filepath):
-        # if it doesnt exist, create and save it
-        df = pd.DataFrame({"url": [], "details": [], "label": []})
-        df.to_csv(filepath, index=False)
-        return df
+        return None
 
     return pd.read_csv(filepath)
 
@@ -66,3 +63,25 @@ def get_manually_labelled_examples(run_path):
 def get_descriptions(run_path):
     filepath = os.path.join(run_path, "basic_descriptions.csv")
     return pd.read_csv(filepath)
+
+
+# Define a new method for DataFrame
+def to_csv_or_append(self, file_name, index=False):
+    """Writes or appends the DataFrame to a CSV file depending on file existence.
+
+    Parameters:
+    - file_name (str): The name of the CSV file.
+    - index (bool): Whether to write row indices. Default is False.
+    """
+    if not os.path.exists(file_name):
+        # If file does not exist, create it and write the header
+        self.to_csv(file_name, mode="w", header=True, index=index)
+        print(f"File created and data written to {file_name}")
+    else:
+        # If file exists, append without writing the header
+        self.to_csv(file_name, mode="a", header=False, index=index)
+        print(f"Data appended to {file_name}")
+
+
+# Bind the method to the DataFrame class
+pd.DataFrame.to_csv_or_append = to_csv_or_append

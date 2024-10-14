@@ -72,24 +72,29 @@ def get_all_urls(start_url):
 
 
 def scrape_details_for_links(links):
-    """Loops through each link and gathers the 'details' section content."""
+    """Loops through each link and gather important information"""
     details_list = []
 
     for link in tqdm(links):
         response = requests.get(link)
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # Extract the "details" section
+        # Extract relevant info
+        title = extract_title(soup)
+        lead_paragraph = extract_lead_paragraph(soup)
+        context = extract_context(soup)
         details = extract_details_section(soup)
-
         publishing_institution = extract_publishing_institution(soup)
 
         details_list += [
             {
                 "url": link,
+                "title": title,
+                "description": lead_paragraph,
+                "context": context,
                 "publishing_institution": publishing_institution,
                 "details": details,
-                "details_scraped_at": datetime.now(),
+                "info_scraped_at": datetime.now(),
             }
         ]
         # Sleep between requests to avoid overwhelming the server
@@ -104,7 +109,43 @@ def extract_details_section(soup):
     if details_section:
         details_text = details_section.get_text(separator="\n", strip=True)
         return details_text
-    return "No details found"
+    return pd.NA
+
+
+def extract_context(soup):
+    """Extracts the text content of a specific element based on the class name."""
+    # Find the <span> element with the specific class
+    element = soup.find("span", class_="govuk-caption-xl gem-c-title__context")
+
+    # If the element exists, extract and return its text
+    if element:
+        element_text = element.get_text(strip=True)
+        return element_text
+    return pd.NA
+
+
+def extract_title(soup):
+    """Extracts the text content of the <h1> element with the specified class."""
+    # Find the <h1> element with the specific class
+    h1_element = soup.find("h1", class_="gem-c-title__text govuk-heading-l")
+
+    # If the element exists, extract and return its text
+    if h1_element:
+        h1_text = h1_element.get_text(strip=True)
+        return h1_text
+    return pd.NA
+
+
+def extract_lead_paragraph(soup):
+    """Extracts the text content of the <p> element with the specified class."""
+    # Find the <p> element with the specific class
+    p_element = soup.find("p", class_="gem-c-lead-paragraph")
+
+    # If the element exists, extract and return its text
+    if p_element:
+        p_text = p_element.get_text(strip=True)
+        return p_text
+    return pd.NA
 
 
 def extract_publishing_institution(soup):
@@ -125,7 +166,7 @@ def extract_publishing_institution(soup):
                     institution = institution_tag.get_text(strip=True)
                     return institution
 
-    return "No publishing institution found"
+    return pd.NA
 
 
 def validate_date(date_str):
