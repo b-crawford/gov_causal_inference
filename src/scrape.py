@@ -81,8 +81,16 @@ def scrape_details_for_links(links):
 
         # Extract the "details" section
         details = extract_details_section(soup)
+
+        publishing_institution = extract_publishing_institution(soup)
+
         details_list += [
-            {"url": link, "details": details, "details_scraped_at": datetime.now()}
+            {
+                "url": link,
+                "publishing_institution": publishing_institution,
+                "details": details,
+                "details_scraped_at": datetime.now(),
+            }
         ]
         # Sleep between requests to avoid overwhelming the server
         time.sleep(np.random.uniform(low=0.5, high=1.5))
@@ -97,6 +105,27 @@ def extract_details_section(soup):
         details_text = details_section.get_text(separator="\n", strip=True)
         return details_text
     return "No details found"
+
+
+def extract_publishing_institution(soup):
+    """Extracts the 'From:' institution from a given soup object."""
+    metadata_list = soup.find("dl", class_="gem-c-metadata__list")
+
+    if metadata_list:
+        # Find all 'dt' elements (terms) and iterate through them
+        terms = metadata_list.find_all("dt", class_="gem-c-metadata__term")
+
+        for term in terms:
+            if term.get_text(strip=True) == "From:":
+                # The corresponding 'dd' element should contain the institution
+                institution_tag = term.find_next_sibling("dd")
+
+                if institution_tag:
+                    # Extract the institution name, potentially inside an <a> tag
+                    institution = institution_tag.get_text(strip=True)
+                    return institution
+
+    return "No publishing institution found"
 
 
 def validate_date(date_str):
@@ -162,7 +191,7 @@ def main(start_date, run_id, rescrape):
     links = get_all_urls(start_url)
 
     # Output the result
-    print(f"Numebr of links found in time window: {len(links)}")
+    print(f"Number of links found in time window: {len(links)}")
 
     # If we are rescraping then set previously scraped to None
     # otherwise find the previously scraped urls from file
