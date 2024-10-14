@@ -51,7 +51,7 @@ def get_next_page_url(soup):
     return None
 
 
-def scrape_all_pages(start_url):
+def get_all_urls(start_url):
     url = start_url
     all_links = []
 
@@ -71,15 +71,6 @@ def scrape_all_pages(start_url):
     return all_links
 
 
-def extract_details_section(soup):
-    """Extracts the 'details' section content from a given soup object."""
-    details_section = soup.find("section", id="details")
-    if details_section:
-        details_text = details_section.get_text(separator="\n", strip=True)
-        return details_text
-    return "No details found"
-
-
 def scrape_details_for_links(links):
     """Loops through each link and gathers the 'details' section content."""
     details_list = []
@@ -90,11 +81,22 @@ def scrape_details_for_links(links):
 
         # Extract the "details" section
         details = extract_details_section(soup)
-        details_list += [{"link": link, "details": details}]
+        details_list += [
+            {"url": link, "details": details, "details_scraped_at": datetime.now()}
+        ]
         # Sleep between requests to avoid overwhelming the server
         time.sleep(np.random.uniform(low=0.5, high=1.5))
 
     return details_list
+
+
+def extract_details_section(soup):
+    """Extracts the 'details' section content from a given soup object."""
+    details_section = soup.find("section", id="details")
+    if details_section:
+        details_text = details_section.get_text(separator="\n", strip=True)
+        return details_text
+    return "No details found"
 
 
 def validate_date(date_str):
@@ -109,46 +111,77 @@ def validate_date(date_str):
         )
 
 
-def save_to_csv(details, start_date):
-
-    df = pd.DataFrame(details)
+def save_to_csv(details_df, start_date, folder_path):
 
     # path to data file
-    folder_path = utils.get_run_folder_path()
     path = os.path.join(folder_path, "basic_descriptions.csv")
     print(f"Saving basic descriptions to: {path}")
 
     # save
-    df.to_csv(path, index=False)
+    details_df.to_csv(path, index=False)
 
     # save meta data
     metadata = pd.DataFrame(
         {
             "start_date": [start_date],
             "run_datetime": [datetime.now()],
-            "n_urls": [len(details)],
+            "n_urls": [len(details_df)],
         }
     )
     metadata_path = os.path.join(folder_path, "scrape_metadata.csv")
     metadata.to_csv(metadata_path, index=False)
 
 
-def main(start_date):
+def empty_details_df():
+    return pd.DataFrame(
+        {
+            "url": [],
+            "details": [],
+            "details_scraped_at": datetime.now(),
+        }
+    )
 
+
+def get_previously_scraped(folder_path):
+    try:
+        path = os.path.join(folder_path, "basic_descriptions.csv")
+        return pd.read_csv(path)
+    except:
+        return empty_details_df()
+
+
+def main(start_date, run_id, rescrape):
+
+    # get the folder for this run
+    folder_path = utils.get_run_folder_path(run_id)
+
+    # get the initial url to start scraping from
     start_url = build_start_url(start_date)
 
-    # Scrape all the pages and get all the links
-    all_links = scrape_all_pages(start_url)
+    # Get all the urls
+    links = get_all_urls(start_url)
 
     # Output the result
-    print(f"Total links found: {len(all_links)}")
+    print(f"Numebr of links found in time window: {len(links)}")
 
-    # Gather details
-    print("Gathering details.")
-    details = scrape_details_for_links(all_links)
+    # If we are rescraping then set previously scraped to None
+    # otherwise find the previously scraped urls from file
+    if rescrape:
+        print("Rescraping all links.")
+        previously_scraped = empty_details_df()
+    else:
+        previously_scraped = get_previously_scraped(folder_path)
+        links = [i for i in links if i not in list(previously_scraped["url"])]
+        print(f"Of these, {len(links)} have not previously been scraped.")
+
+    # Scrape remaining
+    new_details = scrape_details_for_links(links)
+
+    # Concat
+    to_save = pd.concat([previously_scraped, pd.DataFrame(new_details)], axis=0)
 
     # Save to file
-    save_to_csv(details, start_date)
+    save_to_csv(to_save, start_date, folder_path)
 
 
 if __name__ == "__main__":
@@ -156,13 +189,22 @@ if __name__ == "__main__":
     # get the date from command line
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "-r",
+        "--run_id",
+        type=int,
+        help="The run ID for the data over which we should process.",
+        default=None,
+    )
+    parser.add_argument(
         "-d",
         "--date",
         type=validate_date,  # Use the custom validation function
         help="The date to start gathering data from (format: DD/MM/YYYY)",
         default=datetime.today().strftime("%d/%m/%Y"),
     )
+    parser.add_argument("--rescrape", action="store_true", help="Enable verbose output")
+
     args = parser.parse_args()
 
     # run main function
-    main(args.date.strftime("%d/%m/%Y"))
+    main(args.date.strftime("%d/%m/%Y"), args.run_id, args.rescrape)
