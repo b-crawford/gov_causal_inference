@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -43,3 +44,25 @@ def get_run_folder_path(declared_run_id=None, runs_data_folder=runs_data_folder)
         os.makedirs(run_subfolder)
 
     return run_subfolder
+
+
+def get_manually_labelled_filepath(run_path):
+    return os.path.join(run_path, "manually_labelled_examples.csv")
+
+
+def get_manually_labelled_examples(run_path):
+
+    filepath = get_manually_labelled_filepath(run_path)
+
+    if not os.path.exists(filepath):
+        # if it doesnt exist, create and save it
+        df = pd.DataFrame({"url": [], "details": [], "label": []})
+        df.to_csv(filepath, index=False)
+        return df
+
+    return pd.read_csv(filepath)
+
+
+def get_descriptions(run_path):
+    filepath = os.path.join(run_path, "basic_descriptions.csv")
+    return pd.read_csv(filepath)
