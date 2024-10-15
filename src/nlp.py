@@ -7,6 +7,7 @@ from tqdm import tqdm
 import ollama
 import sys
 from transformers import pipeline
+from fuzzywuzzy import fuzz
 
 
 # import local modules
@@ -72,14 +73,14 @@ def extract_keywords(descriptions_df, positive_keywords, negative_keywords):
     nlp = ensure_model_downloaded("en_core_web_sm")
 
     print("Running positive keyword search.")
-    descriptions_df["positive_keywords"] = descriptions_df["details"].progress_apply(
-        lambda x: find_keywords(nlp, x, positive_keywords)
-    )
+    descriptions_df["positive_keywords"] = descriptions_df[
+        "scraped_text"
+    ].progress_apply(lambda x: find_keywords(nlp, x, positive_keywords))
 
     print("Running negative keyword search.")
-    descriptions_df["negative_keywords"] = descriptions_df["details"].progress_apply(
-        lambda x: find_keywords(nlp, x, negative_keywords)
-    )
+    descriptions_df["negative_keywords"] = descriptions_df[
+        "scraped_text"
+    ].progress_apply(lambda x: find_keywords(nlp, x, negative_keywords))
 
     return descriptions_df
 
@@ -99,12 +100,32 @@ def ollama_single_identification(model, project_description):
 
     prompt = identification_prompt.format(project_description=project_description)
 
-    model_response = ollama_run(model, prompt)
+    return ollama_run(model, prompt)
 
-    if model_response.lower() == "true":
-        return True
-    elif model_response.lower() == "false":
-        return False
+
+def ollama_response_to_label(model_response):
+
+    match_cutoff = 90
+
+    # if fuzz.ratio(model_response.lower(), "true")>match_cutoff:
+    #     return 1
+    # elif fuzz.ratio(model_response.lower(), "false")>match_cutoff:
+    #     return -1
+    # elif fuzz.ratio(model_response.lower(), "insufficient information")>match_cutoff:
+    #     return 0
+    # else:
+    #     return pd.NA
+
+    if (
+        fuzz.ratio(model_response.lower(), "potentially_includes_causal_inference")
+        > match_cutoff
+    ):
+        return 1
+    elif (
+        fuzz.ratio(model_response.lower(), "does_not_include_causal_inference")
+        > match_cutoff
+    ):
+        return -1
     else:
         return pd.NA
 
@@ -112,8 +133,12 @@ def ollama_single_identification(model, project_description):
 def ollama_inference(descriptions_df, model):
 
     print(f"Running Ollama identification with model: {model}")
-    descriptions_df["ollama_inference"] = descriptions_df["details"].progress_apply(
+    descriptions_df["ollama_response"] = descriptions_df["scraped_text"].progress_apply(
         lambda x: ollama_single_identification(model, x)
+    )
+
+    descriptions_df["ollama_label"] = descriptions_df["ollama_response"].apply(
+        ollama_response_to_label
     )
 
     return descriptions_df
@@ -136,8 +161,15 @@ def huggingface_inference(descriptions_df, model):
     classifier = pipeline("zero-shot-classification", model=model, device="mps")
 
     descriptions_df["huggingface_prob_causal"] = descriptions_df[
-        "details"
+        "scraped_text"
     ].progress_apply(lambda x: huggingface_single_identification(classifier, x))
+
+    return descriptions_df
+
+
+def prediction(descriptions_df):
+
+    descriptions_df["predicted_label"] = descriptions_df["ollama_label"]
 
     return descriptions_df
 
@@ -177,7 +209,10 @@ if __name__ == "__main__":
     descriptions = ollama_inference(descriptions, args.ollama_model)
 
     # run huggingface processing
-    descriptions = huggingface_inference(descriptions, args.huggingface_model)
+    # descriptions = huggingface_inference(descriptions, args.huggingface_model)
+
+    # final prediction
+    descriptions = prediction(descriptions)
 
     # save data
     descriptions.to_csv(os.path.join(folder_path, "nlp.csv"), index=False)
