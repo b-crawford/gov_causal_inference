@@ -8,6 +8,7 @@ import pandas as pd
 import argparse
 import utils
 import os
+import hashlib
 
 BASE_URL = "https://www.gov.uk"
 
@@ -220,6 +221,32 @@ def get_previously_scraped(folder_path):
         return empty_details_df()
 
 
+def combine_text(title, description, details, context):
+    return f"{title} ({context}) \n{description}\n{details}"
+
+
+def combine_text_df(descriptions_df):
+    descriptions_df["scraped_text"] = descriptions_df.apply(
+        lambda row: combine_text(
+            row["title"], row["description"], row["details"], row["context"]
+        ),
+        axis=1,
+    )
+
+    return descriptions_df
+
+
+def hash_string(string_):
+    # Create a SHA-256 hash object
+    hash_object = hashlib.sha256()
+
+    # Encode the string and update the hash object
+    hash_object.update(string_.encode("utf-8"))
+
+    # Get the hexadecimal representation of the hash
+    return hash_object.hexdigest()
+
+
 def main(start_date, run_id, rescrape):
 
     # get the folder for this run
@@ -247,8 +274,12 @@ def main(start_date, run_id, rescrape):
     # Scrape remaining
     new_details = scrape_details_for_links(links)
 
+    # collate all text and hash it
+    new_details = combine_text_df(pd.DataFrame(new_details))
+    new_details["project_hash"] = new_details["scraped_text"].apply(hash_string)
+
     # Concat
-    to_save = pd.concat([previously_scraped, pd.DataFrame(new_details)], axis=0)
+    to_save = pd.concat([previously_scraped, new_details], axis=0)
 
     # Save to file
     save_to_csv(to_save, start_date, folder_path)
