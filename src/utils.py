@@ -1,11 +1,15 @@
 import os
 import re
-import sys
 import pandas as pd
+import mlflow
 
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+runs_data_folder = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+)
 
-runs_data_folder = "data"
+
+def set_mlflow_file_location(run_id):
+    mlflow.set_tracking_uri(f"{runs_data_folder}/{run_id}/mlflow")
 
 
 def get_max_integer_folder(parent_dir):
@@ -62,6 +66,11 @@ def get_manually_labelled_examples(run_path):
 
 def get_descriptions(run_path):
     filepath = os.path.join(run_path, "basic_descriptions.csv")
+    return pd.read_csv(filepath)
+
+
+def get_nlp(run_path):
+    filepath = os.path.join(run_path, "nlp.csv")
     return pd.read_csv(filepath)
 
 
