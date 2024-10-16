@@ -207,8 +207,6 @@ def empty_details_df():
     return pd.DataFrame(
         {
             "url": [],
-            "details": [],
-            "details_scraped_at": datetime.now(),
         }
     )
 

@@ -100,6 +100,19 @@ if __name__ == "__main__":
         help="The ollama model we should use.",
         default=ollama_identification.DEFAULT_OLLAMA_MODEL,
     )
+    parser.add_argument(
+        "-p",
+        "--prompt_path",
+        type=str,
+        help="The prompt we should use.",
+        default=ollama_identification.DEFAULT_OLLAMA_MODEL,
+    )
+    parser.add_argument(
+        "-f",
+        "--filter_to_keyword_sentences",
+        action="store_true",
+        help="",
+    )
     args = parser.parse_args()
 
     # load data
@@ -128,9 +141,14 @@ if __name__ == "__main__":
             keyword_identification.keyword_inference, **system_kwargs
         )
     elif args.system == "ollama":
+        # Using a context manager to open the prompt and read its contents
+        with open(args.prompt_path, "r", encoding="utf-8") as file:
+            prompt = file.read()
+
         system_kwargs = {
             "model": args.ollama_model,
-            "prompt": ollama_identification.identification_prompt,
+            "prompt": prompt,
+            "filter_to_keyword_sentences": args.filter_to_keyword_sentences,
         }
         predict_function = partial(
             ollama_identification.ollama_inference, **system_kwargs

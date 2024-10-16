@@ -11,21 +11,16 @@ import metrics
 # import local modules
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import utils
+import keyword_search
 
 tqdm.pandas()
 
 DEFAULT_OLLAMA_MODEL = "llama3"
-
-# load identification prompt
-identification_prompt_path = os.path.join(
+DEFAULT_PROMPT_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "prompts",
     "causal_identification.txt",
 )
-
-# Using a context manager to open the prompt and read its contents
-with open(identification_prompt_path, "r", encoding="utf-8") as file:
-    identification_prompt = file.read()
 
 
 # define a function for runing ollama
@@ -40,9 +35,9 @@ def ollama_run(model, prompt):
     return response["message"]["content"]
 
 
-def ollama_single_identification(model, project_description, prompt):
+def ollama_single_identification(model, inputted_data, prompt):
 
-    run_prompt = prompt.format(project_description=project_description)
+    run_prompt = prompt.format(inputted_data=inputted_data)
 
     return ollama_run(model, run_prompt)
 
@@ -61,12 +56,29 @@ def ollama_response_to_label(model_response):
         return pd.NA
 
 
-def ollama_inference(descriptions_df, model, prompt):
+def ollama_inference(descriptions_df, model, prompt, filter_to_keyword_sentences):
+
+    if filter_to_keyword_sentences:
+        descriptions_df = keyword_search.extract_keyword_sentences(
+            descriptions_df,
+            positive_keywords=keyword_search.POSITIVE_KEYWORDS,
+            negative_keywords=keyword_search.NEGATIVE_KEYWORDS,
+        )
+        descriptions_df["prompt_input_info"] = descriptions_df.apply(
+            lambda row: (
+                row["scraped_text"]
+                if len(row["keyword_sentences"]) == 0
+                else "\n".join(row["keyword_sentences"])
+            ),
+            axis=1,
+        )
+    else:
+        descriptions_df["prompt_input_info"] = descriptions_df["scraped_text"]
 
     print(f"Running Ollama identification with model: {model}")
-    descriptions_df["ollama_response"] = descriptions_df["scraped_text"].progress_apply(
-        lambda x: ollama_single_identification(model, x, prompt)
-    )
+    descriptions_df["ollama_response"] = descriptions_df[
+        "prompt_input_info"
+    ].progress_apply(lambda x: ollama_single_identification(model, x, prompt))
 
     descriptions_df["predicted_label"] = descriptions_df["ollama_response"].apply(
         ollama_response_to_label

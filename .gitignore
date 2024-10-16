@@ -146,3 +146,6 @@ dev_notebooks
 # mlflow related items.
 mlflow
 meta.yaml
+
+# exceptions
+!requirements.txt
