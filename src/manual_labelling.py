@@ -3,6 +3,7 @@ import pandas as pd
 import argparse
 import utils
 import textwrap
+import keyword_search
 
 
 # Set the width for text wrapping
@@ -42,7 +43,7 @@ def user_labelling():
             )
 
 
-def main(run_id, only_sample_positives=False):
+def main(run_id, only_sample_containing_keywords=False):
 
     run_path = utils.get_run_folder_path(run_id)
 
@@ -65,13 +66,17 @@ def main(run_id, only_sample_positives=False):
     else:
         merged = descriptions
 
-    # only sample ones which have been predicted as a positive
-    if only_sample_positives:
-        nlp = utils.get_nlp(run_path)
-        nlp = nlp[["project_hash"]].loc[nlp["predicted_label"].isin([0, 1])]
-        merged = merged.merge(nlp, on="project_hash", how="inner")
+    # only sample ones which have keywords
+    if only_sample_containing_keywords:
+
+        merged = keyword_search.extract_keywords(
+            merged, positive_keywords=keyword_search.POSITIVE_KEYWORDS
+        )
+        merged = merged.loc[merged["contains_positive_keyword"]].drop(
+            labels=["contains_positive_keyword", "positive_keywords"], axis=1
+        )
         print(
-            f"Only labelling positively predicted examples. There are {len(merged)} of these."
+            f"Only labelling examples with a keyword. There are {len(merged)} of these."
         )
 
     # randomise the order
@@ -126,10 +131,12 @@ if __name__ == "__main__":
     )
     parser.add_argument("--rescrape", action="store_true", help="Enable verbose output")
     parser.add_argument(
-        "--only_positives", action="store_true", help="Only sample predicted positives."
+        "--only_containing_keywords",
+        action="store_true",
+        help="Only sample predicted positives.",
     )
 
     args = parser.parse_args()
 
     # run main function
-    main(args.run_id, args.only_positives)
+    main(args.run_id, args.only_containing_keywords)
