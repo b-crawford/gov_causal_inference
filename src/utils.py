@@ -87,7 +87,12 @@ def to_csv_or_append(self, file_name, index=False):
         self.to_csv(file_name, mode="w", header=True, index=index)
         print(f"File created and data written to {file_name}")
     else:
-        # If file exists, append without writing the header
+        # Open the file and check if the last character is a newline
+        with open(file_name, "rb+") as f:
+            f.seek(-1, os.SEEK_END)  # Go to the last byte in the file
+            last_char = f.read(1)
+            if last_char != b"\n":
+                f.write(b"\n")  # Append a newline if the last char is not a newline
         self.to_csv(file_name, mode="a", header=False, index=index)
         print(f"Data appended to {file_name}")
 

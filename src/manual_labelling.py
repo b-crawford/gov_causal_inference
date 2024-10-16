@@ -72,9 +72,12 @@ def main(run_id, only_sample_containing_keywords=False):
         merged = keyword_search.extract_keywords(
             merged, positive_keywords=keyword_search.POSITIVE_KEYWORDS
         )
-        merged = merged.loc[merged["contains_positive_keyword"]].drop(
-            labels=["contains_positive_keyword", "positive_keywords"], axis=1
+        merged = (
+            merged.loc[merged["contains_positive_keyword"]]
+            .reset_index(drop=True)
+            .drop(labels=["contains_positive_keyword", "positive_keywords"], axis=1)
         )
+
         print(
             f"Only labelling examples with a keyword. There are {len(merged)} of these."
         )
