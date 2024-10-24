@@ -11,6 +11,7 @@ import huggingface_identification
 import keyword_identification
 import ollama_identification
 import baseline_identification
+import finetune_identification
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import utils
@@ -20,13 +21,11 @@ import keyword_search
 def log_metrics(prediction_df, run_id, labels, system, **kwargs):
 
     # Calculate precision and recall for each label
-    precision, recall, f1, n_manually_labelled, n_failed_prediction = (
-        metrics.get_metrics(
-            prediction_df=prediction_df,
-            predict_label_column="predicted_label",
-            actual_label_column="label",
-            labels=labels,
-        )
+    precision, recall, f1, n_eval, n_failed_prediction = metrics.get_metrics(
+        prediction_df=prediction_df,
+        predict_label_column="predicted_label",
+        actual_label_column="label",
+        labels=labels,
     )
 
     # set the mlflow server
@@ -37,8 +36,8 @@ def log_metrics(prediction_df, run_id, labels, system, **kwargs):
         # log the system
         mlflow.log_param("system", system)
 
-        # log the number of manually labelled in the dataset
-        mlflow.log_param("n_manually_labelled", n_manually_labelled)
+        # log the number of manually labelled in the eval dataset
+        mlflow.log_param("n_evaluation_set", n_eval)
 
         # log the number for which prediction failed
         mlflow.log_param("n_failed_prediction", n_failed_prediction)
@@ -105,13 +104,20 @@ if __name__ == "__main__":
         "--prompt_path",
         type=str,
         help="The prompt we should use.",
-        default=ollama_identification.DEFAULT_OLLAMA_MODEL,
+        default=ollama_identification.DEFAULT_PROMPT_PATH,
     )
     parser.add_argument(
         "-f",
         "--filter_to_keyword_sentences",
         action="store_true",
         help="",
+    )
+    parser.add_argument(
+        "-ft",
+        "--finetune_model_path",
+        type=str,
+        help="The path to the finetuned model.",
+        default=finetune_identification.BASE_MODEL_PATH,
     )
     args = parser.parse_args()
 
@@ -153,14 +159,28 @@ if __name__ == "__main__":
         predict_function = partial(
             ollama_identification.ollama_inference, **system_kwargs
         )
+    elif args.system == "finetune":
+
+        if args.finetune_model_path == finetune_identification.BASE_MODEL_PATH:
+            model_path = finetune_identification.train(
+                run_path, args.finetune_model_path
+            )
+        else:
+            model_path = args.finetune_model_path
+
+        system_kwargs = {
+            "model_path": model_path,
+        }
+
+        predict_function = partial(finetune_identification.predict, **system_kwargs)
     else:
         raise ValueError(f"Invalid system declared.")
 
     if args.evaluation_mode:
-        # get the manually labelled
-        manually_labelled = utils.get_manually_labelled_examples(run_path)
+        # get the eval dataset
+        eval_dataset = utils.get_eval_examples(run_path)
 
-        run_df = manually_labelled[["project_hash", "label"]].merge(
+        run_df = eval_dataset[["project_hash", "label"]].merge(
             descriptions,
             how="left",
             on="project_hash",

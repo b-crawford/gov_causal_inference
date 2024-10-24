@@ -64,9 +64,41 @@ def get_manually_labelled_examples(run_path):
     return pd.read_csv(filepath)
 
 
+def get_training_filepath(run_path):
+    return os.path.join(run_path, "training_examples.csv")
+
+
+def get_training_examples(run_path):
+
+    filepath = get_training_filepath(run_path)
+
+    if not os.path.exists(filepath):
+        return pd.DataFrame({"project_hash": []})
+
+    return pd.read_csv(filepath)
+
+
+def get_eval_filepath(run_path):
+    return os.path.join(run_path, "eval_examples.csv")
+
+
+def get_eval_examples(run_path):
+
+    filepath = get_eval_filepath(run_path)
+
+    if not os.path.exists(filepath):
+        return pd.DataFrame({"project_hash": []})
+
+    return pd.read_csv(filepath)
+
+
 def get_descriptions(run_path):
     filepath = os.path.join(run_path, "basic_descriptions.csv")
     return pd.read_csv(filepath)
+
+
+def get_finetune_model_folder(run_path):
+    return os.path.join(run_path, "finetuned_model")
 
 
 def get_nlp(run_path):
